@@ -1,10 +1,13 @@
 import { prisma } from '@/app/lib/prisma'
 import { NextResponse } from 'next/server'
+import { requireRole } from '@/app/lib/auth-server'
 
 export async function GET() {
   try {
     const patients = await prisma.patient.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: {
+        createdAt: 'desc',
+      },
     })
 
     return NextResponse.json(patients)
@@ -18,47 +21,26 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireRole(['ADMIN', 'RECEPCION'])
+
+  if (!auth.ok) {
+    return NextResponse.json(
+      { error: auth.error },
+      { status: auth.status }
+    )
+  }
+
   try {
     const body = await req.json()
 
     const name = String(body.name || '').trim()
+    const birthDate = body.birthDate ? new Date(body.birthDate) : null
     const phone = String(body.phone || '').trim()
-    const email = String(body.email || '').trim().toLowerCase()
-    const birthDate = body.birthDate || null
+    const email = String(body.email || '').trim()
 
     if (!name) {
       return NextResponse.json(
-        { error: 'El nombre es obligatorio' },
-        { status: 400 }
-      )
-    }
-
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json(
-        { error: 'El correo no tiene formato válido' },
-        { status: 400 }
-      )
-    }
-
-    if (phone && phone.length < 8) {
-      return NextResponse.json(
-        { error: 'El teléfono debe tener al menos 8 caracteres' },
-        { status: 400 }
-      )
-    }
-
-    const duplicate = await prisma.patient.findFirst({
-      where: {
-        OR: [
-          ...(email ? [{ email }] : []),
-          ...(phone ? [{ phone }] : []),
-        ],
-      },
-    })
-
-    if (duplicate) {
-      return NextResponse.json(
-        { error: 'Ya existe un paciente con ese correo o teléfono' },
+        { error: 'El nombre del paciente es obligatorio' },
         { status: 400 }
       )
     }
@@ -66,7 +48,7 @@ export async function POST(req: Request) {
     const patient = await prisma.patient.create({
       data: {
         name,
-        birthDate: birthDate ? new Date(birthDate) : null,
+        birthDate,
         phone: phone || null,
         email: email || null,
       },
@@ -76,25 +58,7 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error(error)
     return NextResponse.json(
-      { error: 'Error al guardar paciente' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function DELETE(req: Request) {
-  try {
-    const body = await req.json()
-
-    await prisma.patient.delete({
-      where: { id: Number(body.id) },
-    })
-
-    return NextResponse.json({ message: 'Paciente eliminado' })
-  } catch (error) {
-    console.error(error)
-    return NextResponse.json(
-      { error: 'Error al eliminar paciente' },
+      { error: 'Error al crear paciente' },
       { status: 500 }
     )
   }
