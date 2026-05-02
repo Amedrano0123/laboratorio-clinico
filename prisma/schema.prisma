@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Patient {
+  id        Int        @id @default(autoincrement())
+  name      String
+  birthDate DateTime?
+  phone     String?
+  email     String?
+  createdAt DateTime   @default(now())
+
+  orders LabOrder[]
+}
+
+model Study {
+  id    Int     @id @default(autoincrement())
+  name  String
+  price Float?
+
+  appointments Appointment[]   // 👈 🔥 ESTA LÍNEA FALTABA
+}
+
+model LabOrder {
+  id          Int       @id @default(autoincrement())
+  folio       String?   @unique
+  patientId   Int
+  status      String
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  patient     Patient   @relation(fields: [patientId], references: [id])
+  appointments Appointment[]
+}
+
+model Appointment {
+  id        Int       @id @default(autoincrement())
+  date      DateTime
+  status    String
+
+  studyId   Int
+  study     Study     @relation(fields: [studyId], references: [id])
+
+  orderId   Int
+  order     LabOrder  @relation(fields: [orderId], references: [id])
+
+  result    Result?
+}
+
+model Result {
+  id            Int      @id @default(autoincrement())
+  appointmentId Int      @unique
+  values        String
+  notes         String?
+
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("RECEPCION")
+  createdAt    DateTime @default(now())
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  userName  String?
+  userRole  String?
+  action    String
+  entity    String
+  entityId  Int?
+  detail    String?
+  createdAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
