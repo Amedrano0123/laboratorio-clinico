@@ -1,10 +1,7 @@
 import { prisma } from '@/app/lib/prisma'
 import { NextResponse } from 'next/server'
 
-export async function GET(
-  req: Request,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function GET(req: Request, context: any) {
   try {
     const { id } = await context.params
 
@@ -13,8 +10,12 @@ export async function GET(
       include: {
         appointment: {
           include: {
-            patient: true,
             study: true,
+            order: {
+              include: {
+                patient: true,
+              },
+            },
           },
         },
       },
@@ -32,6 +33,29 @@ export async function GET(
     console.error(error)
     return NextResponse.json(
       { error: 'Error al obtener resultado' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function PUT(req: Request, context: any) {
+  try {
+    const { id } = await context.params
+    const body = await req.json()
+
+    const result = await prisma.result.update({
+      where: { id: Number(id) },
+      data: {
+        values: String(body.values || body.resultText || '').trim(),
+        notes: body.notes || body.observations || null,
+      },
+    })
+
+    return NextResponse.json(result)
+  } catch (error) {
+    console.error(error)
+    return NextResponse.json(
+      { error: 'Error al actualizar resultado' },
       { status: 500 }
     )
   }

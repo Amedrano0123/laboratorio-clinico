@@ -1,18 +1,24 @@
 'use client';
 
+import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token') || '';
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [saving, setSaving] = useState(false);
 
   async function submit() {
     if (!token) {
       alert('Token inválido');
+      return;
+    }
+
+    if (!password || !confirmPassword) {
+      alert('Captura y confirma la nueva contraseña');
       return;
     }
 
@@ -21,6 +27,8 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    setSaving(true);
+
     const res = await fetch('/api/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -28,6 +36,8 @@ export default function ResetPasswordPage() {
     });
 
     const data = await res.json();
+
+    setSaving(false);
 
     if (!res.ok) {
       alert(data.error || 'Error al restablecer contraseña');
@@ -42,6 +52,10 @@ export default function ResetPasswordPage() {
     <main className="flex min-h-screen items-center justify-center bg-gray-100 p-8">
       <section className="w-full max-w-md rounded-xl bg-white p-6 shadow">
         <h1 className="text-2xl font-bold">Nueva contraseña</h1>
+
+        <p className="mt-1 text-sm text-gray-500">
+          Captura tu nueva contraseña para recuperar el acceso.
+        </p>
 
         <div className="mt-6 grid gap-4">
           <input
@@ -62,12 +76,28 @@ export default function ResetPasswordPage() {
 
           <button
             onClick={submit}
-            className="rounded bg-blue-600 p-2 text-white hover:bg-blue-700"
+            disabled={saving}
+            className="rounded bg-blue-600 p-2 text-white hover:bg-blue-700 disabled:bg-gray-400"
           >
-            Actualizar contraseña
+            {saving ? 'Actualizando...' : 'Actualizar contraseña'}
           </button>
+
+          <a
+            href="/login"
+            className="text-center text-sm text-blue-600 hover:underline"
+          >
+            Regresar al login
+          </a>
         </div>
       </section>
     </main>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<main className="p-8">Cargando...</main>}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
