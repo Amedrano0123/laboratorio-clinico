@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import UserBar from '@/components/UserBar';
 
 type Patient = {
@@ -15,75 +15,173 @@ export default function PacientesPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [search, setSearch] = useState('');
 
+  const [name, setName] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [saving, setSaving] = useState(false);
+
   async function loadPatients() {
     const res = await fetch('/api/patients');
     const data = await res.json();
-    setPatients(data);
+
+    setPatients(Array.isArray(data) ? data : []);
   }
 
   useEffect(() => {
     loadPatients();
   }, []);
 
-  const filteredPatients = patients.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredPatients = useMemo(() => {
+    const term = search.toLowerCase().trim();
+
+    if (!term) return patients;
+
+    return patients.filter((p) => {
+      return (
+        p.name.toLowerCase().includes(term) ||
+        (p.phone || '').toLowerCase().includes(term) ||
+        (p.email || '').toLowerCase().includes(term)
+      );
+    });
+  }, [patients, search]);
+
+  async function createPatient() {
+    if (!name.trim()) {
+      alert('El nombre del paciente es obligatorio');
+      return;
+    }
+
+    setSaving(true);
+
+    const res = await fetch('/api/patients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        birthDate: birthDate || null,
+        phone,
+        email,
+      }),
+    });
+
+    const data = await res.json();
+
+    setSaving(false);
+
+    if (!res.ok) {
+      alert(data.error || 'Error al guardar paciente');
+      return;
+    }
+
+    alert('Paciente guardado ✅');
+
+    setName('');
+    setBirthDate('');
+    setPhone('');
+    setEmail('');
+
+    loadPatients();
+  }
 
   return (
     <main className="min-h-screen bg-gray-100 p-8">
-  <UserBar />
+      <UserBar />
 
-      <h1 className="text-3xl font-bold">Pacientes</h1>
+      <h1 className="mt-6 text-3xl font-bold">Pacientes</h1>
 
-      {/* 🔍 BUSCADOR */}
-      <input
-        type="text"
-        placeholder="Buscar paciente..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="mt-4 w-full rounded border p-2"
-      />
+      <section className="mt-6 rounded-xl bg-white p-6 shadow">
+        <h2 className="text-xl font-semibold">Nuevo paciente</h2>
 
-      {/* LISTA */}
-      <div className="mt-6 bg-white p-6 rounded shadow">
+        <div className="mt-4 grid gap-4">
+          <input
+            className="rounded border p-2"
+            placeholder="Nombre completo"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
 
-        {filteredPatients.map((patient) => (
-          <div key={patient.id} className="mb-3 flex justify-between border-b pb-2">
+          <input
+            className="rounded border p-2"
+            type="date"
+            value={birthDate}
+            onChange={(e) => setBirthDate(e.target.value)}
+          />
 
-            <div>
-              <p className="font-semibold">{patient.name}</p>
-              <p className="text-sm text-gray-500">
-                {patient.phone || 'Sin teléfono'}
-              </p>
-            </div>
+          <input
+            className="rounded border p-2"
+            placeholder="Teléfono"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
 
-            <div className="space-x-2">
+          <input
+            className="rounded border p-2"
+            placeholder="Correo"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
 
-              <a
-                href={`/pacientes/${patient.id}`}
-                className="bg-blue-600 text-white px-3 py-1 rounded"
-              >
-                Historial
-              </a>
+          <button
+            onClick={createPatient}
+            disabled={saving}
+            className="rounded bg-blue-600 p-2 text-white hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            {saving ? 'Guardando...' : 'Guardar paciente'}
+          </button>
+        </div>
+      </section>
 
-              <a
-                href={`/orders?patientId=${patient.id}`}
-                className="bg-green-600 text-white px-3 py-1 rounded"
-              >
-                Nueva orden
-              </a>
+      <section className="mt-6 rounded-xl bg-white p-6 shadow">
+        <h2 className="text-xl font-semibold">Pacientes registrados</h2>
 
-            </div>
+        <input
+          className="mt-4 w-full rounded border p-2"
+          placeholder="Buscar paciente..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
 
-          </div>
-        ))}
+        {filteredPatients.length === 0 ? (
+          <p className="mt-4 text-gray-500">No se encontraron pacientes</p>
+        ) : (
+          <table className="mt-4 w-full border-collapse">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="p-2">Nombre</th>
+                <th className="p-2">Nacimiento</th>
+                <th className="p-2">Teléfono</th>
+                <th className="p-2">Correo</th>
+                <th className="p-2">Acciones</th>
+              </tr>
+            </thead>
 
-        {filteredPatients.length === 0 && (
-          <p className="text-gray-500">No se encontraron pacientes</p>
+            <tbody>
+              {filteredPatients.map((p) => (
+                <tr key={p.id} className="border-b">
+                  <td className="p-2">{p.name}</td>
+                  <td className="p-2">
+                    {p.birthDate
+                      ? new Date(p.birthDate).toLocaleDateString()
+                      : '-'}
+                  </td>
+                  <td className="p-2">{p.phone || '-'}</td>
+                  <td className="p-2">{p.email || '-'}</td>
+                  <td className="p-2">
+                    <a
+                      href={`/pacientes/${p.id}`}
+                      className="rounded bg-gray-700 px-3 py-1 text-white"
+                    >
+                      Ver historial
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
-
-      </div>
-
+      </section>
     </main>
   );
 }
